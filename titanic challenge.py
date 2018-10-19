@@ -1,148 +1,112 @@
-# -*- coding: utf-8 -*-
-"""
-Spyder Editor
-
-This is a temporary script file.
-"""
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def preprocess_test_set(dataset):
+import seaborn as sns
+from sklearn.metrics import confusion_matrix, accuracy_score
+
+
+train = pd.read_csv('train.csv')
+test = pd.read_csv('test.csv')
+
+
+
+for dataset in [train , test]:
+    dataset['Title'] = dataset['Name'].str.split(',').str[1].str.split('.').str[0].str.strip()
+    print(dataset['Title'].value_counts())
+    print()
     
-    dataset = dataset.drop('Name' , 1)
-    dataset = dataset.drop('Cabin' , 1)
-    dataset = dataset.drop('Ticket' , 1)
-    dataset = dataset.drop('PassengerId' , 1)
-    dataset = dataset.drop('Embarked' , 1)
-    dataset = dataset.drop('Fare' , 1)
+sns.catplot(x='Survived', y='Title', data=train, kind ='bar')
 
+train.drop(['PassengerId' , 'Ticket'] , axis =1 , inplace = True)
+test.drop(['Ticket'] , axis =1 , inplace = True)
+
+test['Fare'].fillna(test[test['Pclass'] == 3].Fare.median(), inplace = True)
+
+
+print(train[['Age','Title']].groupby('Title').mean())
+sns.catplot(x='Age', y='Title', data=train, kind ='bar')
+
+def getTitle(series):
+    return series.str.split(',').str[1].str.split('.').str[0].str.strip()
+print(getTitle(train[train.Age.isnull()].Name).value_counts())
+mr_mask = train['Title'] == 'Mr'
+miss_mask = train['Title'] == 'Miss'
+mrs_mask = train['Title'] == 'Mrs'
+master_mask = train['Title'] == 'Master'
+dr_mask = train['Title'] == 'Dr'
+train.loc[mr_mask, 'Age'] = train.loc[mr_mask, 'Age'].fillna(train[train.Title == 'Mr'].Age.mean())
+train.loc[miss_mask, 'Age'] = train.loc[miss_mask, 'Age'].fillna(train[train.Title == 'Miss'].Age.mean())
+train.loc[mrs_mask, 'Age'] = train.loc[mrs_mask, 'Age'].fillna(train[train.Title == 'Mrs'].Age.mean())
+train.loc[master_mask, 'Age'] = train.loc[master_mask, 'Age'].fillna(train[train.Title == 'Master'].Age.mean())
+train.loc[dr_mask, 'Age'] = train.loc[dr_mask, 'Age'].fillna(train[train.Title == 'Dr'].Age.mean())
+print()
+print(getTitle(train[train.Age.isnull()].Name).value_counts())
+
+print(getTitle(test[test.Age.isnull()].Name).value_counts())
+mr_mask = test['Title'] == 'Mr'
+miss_mask = test['Title'] == 'Miss'
+mrs_mask = test['Title'] == 'Mrs'
+master_mask = test['Title'] == 'Master'
+ms_mask = test['Title'] == 'Ms'
+test.loc[mr_mask, 'Age'] = test.loc[mr_mask, 'Age'].fillna(test[test.Title == 'Mr'].Age.mean())
+test.loc[miss_mask, 'Age'] = test.loc[miss_mask, 'Age'].fillna(test[test.Title == 'Miss'].Age.mean())
+test.loc[mrs_mask, 'Age'] = test.loc[mrs_mask, 'Age'].fillna(test[test.Title == 'Mrs'].Age.mean())
+test.loc[master_mask, 'Age'] = test.loc[master_mask, 'Age'].fillna(test[test.Title == 'Master'].Age.mean())
+test.loc[ms_mask, 'Age'] = test.loc[ms_mask, 'Age'].fillna(test[test.Title == 'Miss'].Age.mean())
+print(getTitle(test[test.Age.isnull()].Name).value_counts())
+
+
+
+
+train['Title'] = train['Title'].replace('Mlle', 'Miss').replace('Ms', 'Miss').replace('Mme', 'Mrs').replace(['Dr', 'Major', 'Col', 'Rev', 'Lady', 'Jonkheer', 'Don', 'Sir', 'Dona', 'Capt', 'the Countess'], 'Special')
+test['Title'] = test['Title'].replace('Mlle', 'Miss').replace('Ms', 'Miss').replace('Mme', 'Mrs').replace(['Dr', 'Major', 'Col', 'Rev', 'Lady', 'Jonkheer', 'Don', 'Sir', 'Dona', 'Capt', 'the Countess'], 'Special')
+[df.drop(columns=['Name'], inplace = True) for df in [train, test]]
+[train, test] = [pd.get_dummies(data = df, columns = ['Title']) for df in [train, test]]
+
+
+for df in [train, test]:
+    df['HasCabin'] = df['Cabin'].notna().astype(int)
+    df['FamilySize'] = df['SibSp'] + df['Parch'] + 1
+    df['IsAlone'] = (df['FamilySize'] > 1).astype(int)
+
+
+[df.drop(columns=['Cabin', 'SibSp', 'Parch'], inplace = True) for df in [train, test]]
+
+
+for df in [train, test]:
+    df.dropna(subset = ['Embarked'], inplace = True)
     
+[train, test] = [pd.get_dummies(data = df, columns = ['Sex']) for df in [train, test]]
+[train, test] = [pd.get_dummies(data = df, columns = ['Pclass']) for df in [train, test]]
+[train, test] = [pd.get_dummies(data = df, columns = ['Embarked']) for df in [train, test]]
+
+pass_id = test['PassengerId']
+test.drop('PassengerId'  , axis =1 , inplace =True)
+y_train = train['Survived']
+
+train.drop('Survived' , axis =1 , inplace = True)
+
+y_train = np.array(y_train)
+y_train = y_train.reshape((889 , 1))
+
+
+from xgboost import XGBClassifier
+xgb = XGBClassifier()
+xgb.fit(train , y_train)
+y_pred = xgb.predict(test)
+
+
+from sklearn.svm import SVC
+svc = SVC()
+svc.fit(train , y_train)
+y_pred = svc.predict(test)
+
+result = pd.DataFrame()
     
-    #dealing with categorical data
-    from sklearn.preprocessing import LabelEncoder
-    label_encoder_a = LabelEncoder()
-    dataset.iloc[: , 0]  = label_encoder_a.fit_transform( dataset.iloc[: , 0])
-    dataset.iloc[: , 1]  = label_encoder_a.fit_transform( dataset.iloc[: , 1])
-    
-    
-    #dealing with the misssing data
-    dataset.iloc[:,2].fillna(dataset.iloc[: , 2].mean() , inplace = True)
-    
-    from sklearn.preprocessing import OneHotEncoder
-    onehotencoder = OneHotEncoder(categorical_features=[0,1])
-    dataset = onehotencoder.fit_transform(dataset).toarray()  
-    
-    
-    return dataset
+result['PassengerId'] = pass_id
+result['Survived'] = y_pred
 
-
-from sklearn.preprocessing import StandardScaler
-standard_scaler = StandardScaler()
-
-training_set = pd.read_csv('train.csv')
-y = training_set.iloc[:,1].values 
-training_set = training_set.drop('Survived' , 1)
-training_set = preprocess_test_set(training_set)
-training_set = standard_scaler.fit_transform(training_set)
-
-
-# Fitting K-NN to the Training set
-#from sklearn.svm import SVC
-#classifier = SVC(kernel = 'linear', random_state = 0)
-#classifier.fit(training_set, y)
-
-
-#preprocessing the test set
-test_set = pd.read_csv('test.csv')
-passenger = pd.DataFrame(test_set.iloc[: , 0])
-test_set = test_set.drop('Name' , 1)
-test_set = test_set.drop('Cabin' , 1)
-test_set = test_set.drop('Ticket' , 1)
-test_set = test_set.drop('PassengerId' , 1)
-test_set = test_set.drop('Embarked' , 1)
-test_set = test_set.drop('Fare' , 1)
-
-
-
-
-#dealing with categorical data
-from sklearn.preprocessing import LabelEncoder
-label_encoder = LabelEncoder()
-test_set.iloc[: , 0]  = label_encoder.fit_transform( test_set.iloc[: , 0])
-test_set.iloc[: , 1]  = label_encoder.fit_transform( test_set.iloc[: , 1])
-
-
-
-
-#dealing with the misssing data
-test_set.iloc[:,2].fillna(test_set.iloc[: , 2].mean() , inplace = True)
-test_set.iloc[:,0].fillna(test_set.iloc[: , 0].mode()  , inplace = True)
-test_set.iloc[:,1].fillna(test_set.iloc[: , 1].mode() , inplace = True)
-test_set.iloc[:,3].fillna(test_set.iloc[: , 3].mode() , inplace = True)
-test_set.iloc[:,4].fillna(test_set.iloc[: , 4].mode() , inplace = True)
-
-
-
-from sklearn.preprocessing import OneHotEncoder
-onehotencoder_a = OneHotEncoder(categorical_features=[0,1])
-test_set = onehotencoder_a.fit_transform(test_set).toarray()   
-
-test_set = standard_scaler.transform(test_set) 
-
-
-
-
-from sklearn.decomposition import PCA
-pca = PCA(n_components = 5)
-training_set = pca.fit_transform(training_set)
-test_set = pca.transform(test_set)
-explained_variance = pca.explained_variance_ratio_
-
-
-#****************************************************************************************************
-import keras
-from keras.models import Sequential      # this is used to iinitialise pur neural network
-from keras.layers import Dense        # this is used to make the different layers ofour nueral network
-
-#initialising the ANN
-classifier = Sequential()
-
-#adding the input layer and the first hidden layer
-classifier.add(Dense( units = 6 , input_shape = (5,) , kernel_initializer= 'uniform' , activation='relu' ))
-
-# adding the second hidden layer
-classifier.add(Dense( units = 4 , kernel_initializer= 'uniform' , activation='relu' ))
-classifier.add(Dense( units = 6 , kernel_initializer= 'uniform' , activation='relu' ))
-classifier.add(Dense( units = 2 , kernel_initializer= 'uniform' , activation='relu' ))
-
-#adding the output layer
-classifier.add(Dense( units = 1 , kernel_initializer= 'uniform' , activation='sigmoid' ))   # if the output has more than two categories than use the 'softmax, instead of sigmoid
-
-#compiling the ANN
-classifier.compile(optimizer='adam' , loss='binary_crossentropy' ,metrics=['accuracy'] ,)
-
-#fitting the ANN to the training set
-classifier.fit(training_set , y , batch_size=5 , epochs=100)
-
-
-
-
-#****************************************************************************************************
-
-y_pred = classifier.predict(test_set)
-
-for k in range (0,418):
-    if y_pred[k] >= 0.55:
-        y_pred[k] = 1
-    else:
-        y_pred[k] = 0
-        
-passenger['Survived'] = y_pred
-
-passenger.to_csv('final.csv' , index = False)
-
-
-
-
+print(result['Survived'].value_counts())
+result.to_csv('result.csv' , index = False)
 
